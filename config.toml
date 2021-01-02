@@ -1,0 +1,6 @@
+[account_db]
+verbose = true
+
+[login_server]
+address = "localhost"
+port = 6061
