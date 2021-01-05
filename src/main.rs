@@ -1,5 +1,4 @@
-use async_std::net::Ipv4Addr;
-use std::{error::Error, sync::Arc};
+use std::{error::Error, net::SocketAddr, sync::Arc};
 
 use account::InMemoryAccountDB;
 use login_server::LoginServer;
@@ -28,7 +27,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         config::AccountDB::InMemory { verbose } => {
             let account_db = InMemoryAccountDB::new(verbose);
             let login_server = LoginServer::new(Arc::new(account_db));
-            async_std::task::block_on(login_server.run((Ipv4Addr::LOCALHOST, 6061)))?;
+            let addr: SocketAddr = format!("{}:{}", config.login_server.address, config.login_server.port).parse()?;
+            async_std::task::block_on(login_server.run(addr))?;
         }
         config::AccountDB::SQL {} => {
             todo!("Implement me");

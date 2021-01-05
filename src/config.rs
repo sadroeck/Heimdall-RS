@@ -16,8 +16,8 @@ pub enum AccountDB {
 
 #[derive(Deserialize, Debug)]
 pub struct LoginServer {
-    address: String,
-    port: u16,
+    pub(crate) address: String,
+    pub(crate) port: u16,
 }
 
 pub fn init_config() -> Result<Config, impl Error> {

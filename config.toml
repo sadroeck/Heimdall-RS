@@ -2,5 +2,5 @@
 verbose = true
 
 [login_server]
-address = "localhost"
-port = 6061
+address = "127.0.0.1"
+port = 6900
