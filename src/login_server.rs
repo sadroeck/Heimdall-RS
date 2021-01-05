@@ -67,7 +67,10 @@ async fn process_connection<A: AccountDB + Send + Sync>(account_db: Arc<A>, stre
                     LoginCredentials::Hashed {
                         username, password, ..
                     } => {
-                        debug!("Logging in username={:?} pass={:?}", username, password);
+                        debug!("Logging in username={} pass={:?}",
+                            String::from_utf8_lossy(&username[..]),
+                           password,
+                        );
                         match account_db.get_account_by_user(username).await {
                             Ok(account) => {
                                 if let account::Password::MD5Hashed(hashed) = account.password {
@@ -90,7 +93,10 @@ async fn process_connection<A: AccountDB + Send + Sync>(account_db: Arc<A>, stre
                     LoginCredentials::ClearText {
                         username, password, ..
                     } => {
-                        debug!("Logging in username={:?} pass={:?}", username, password);
+                        debug!("Logging in username={} pass={}",
+                            String::from_utf8_lossy(&username[..]),
+                            String::from_utf8_lossy(&password[..])
+                        );
                         match account_db.get_account_by_user(username).await {
                             Ok(account) => {
                                 if let account::Password::Cleartext(cleartext) = account.password {
