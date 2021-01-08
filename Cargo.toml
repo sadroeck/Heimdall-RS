@@ -5,6 +5,7 @@ authors = ["Sam De Roeck <sadroeck@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+async-codec = "0.4"
 async-std = "1.8"
 async-trait = "0.1"
 chrono = "0.4"

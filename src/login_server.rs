@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_codec::Framed;
 use async_std::{
     io::Error as IOError,
     net::{Shutdown, SocketAddr, TcpListener},
@@ -10,7 +11,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::{
     account::{self, AccountDB},
-    api::login::{LoginCredentials, Request},
+    api::login::{LoginCodec, LoginCredentials, Request},
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -51,82 +52,80 @@ async fn process_connection<A: AccountDB + Send + Sync>(account_db: Arc<A>, stre
         debug!("Received incoming connection from {}", peer_addr);
     }
 
-    match Request::parse(&stream).await {
-        Ok(request) => {
-            debug!("Received request: {:#?}", request);
-            match request {
-                Request::KeepAlive => {}
-                Request::UpdateClientHash(hash) => {
-                    debug!("Updating client hash {:?}", hash);
-                    todo!("handle update client hash");
-                }
-                Request::ClientLogin(credentials) => match credentials {
-                    LoginCredentials::OTP { .. } => {
-                        todo!("Handle OTPs");
-                    }
-                    LoginCredentials::Hashed {
-                        username, password, ..
-                    } => {
-                        debug!("Logging in username={} pass={:?}",
-                            String::from_utf8_lossy(&username[..]),
-                           password,
-                        );
-                        match account_db.get_account_by_user(username).await {
-                            Ok(account) => {
-                                if let account::Password::MD5Hashed(hashed) = account.password {
-                                    if password == hashed {
-                                        debug!("Successful login");
-                                    } else {
-                                        warn!("Invalid password");
-                                        todo!("handle response");
-                                    }
-                                } else {
-                                    warn!("Invalid password type");
-                                    todo!("handle response");
-                                }
-                            }
-                            Err(err) => {
-                                error!(%err);
-                            }
-                        }
-                    }
-                    LoginCredentials::ClearText {
-                        username, password, ..
-                    } => {
-                        debug!("Logging in username={} pass={}",
-                            String::from_utf8_lossy(&username[..]),
-                            String::from_utf8_lossy(&password[..])
-                        );
-                        match account_db.get_account_by_user(username).await {
-                            Ok(account) => {
-                                if let account::Password::Cleartext(cleartext) = account.password {
-                                    if password == cleartext {
-                                        debug!("Successful login");
-                                    } else {
-                                        warn!("Invalid password");
-                                        todo!("handle response");
-                                    }
-                                } else {
-                                    warn!("Invalid password type");
-                                    todo!("handle response");
-                                }
-                            }
-                            Err(err) => {
-                                error!(%err);
-                            }
-                        }
-                    }
-                },
-                Request::CodeKey => {}
-                Request::OneTimeToken => {}
-                Request::ConnectChar => {}
+    let mut framed_stream = Framed::new(stream, LoginCodec {});
+
+    while let Some(res) = framed_stream.next().await {
+        match res {
+            Ok(Request::KeepAlive) => {
+                debug!("Keep alive");
             }
-        }
-        Err(err) => {
-            error!("Could not parse request: {}", err);
-            stream
-                .shutdown(Shutdown::Both)
-                .expect("Could not shut down stream");
+            Ok(Request::UpdateClientHash(hash)) => {
+                debug!("Updating client hash {:?}", hash);
+                todo!("handle update client hash");
+            }
+            Ok(Request::ClientLogin(credentials)) => match credentials {
+                LoginCredentials::OTP { .. } => {
+                    todo!("Handle OTPs");
+                }
+                LoginCredentials::Hashed {
+                    username, password, ..
+                } => {
+                    debug!(
+                        "Logging in username={} pass={:?}",
+                        String::from_utf8_lossy(&username[..]),
+                        password,
+                    );
+                    match account_db.get_account_by_user(username).await {
+                        Ok(account) => {
+                            if let account::Password::MD5Hashed(hashed) = account.password {
+                                if password == hashed {
+                                    debug!("Successful login");
+                                } else {
+                                    warn!("Invalid password");
+                                    todo!("handle response");
+                                }
+                            } else {
+                                warn!("Invalid password type");
+                                todo!("handle response");
+                            }
+                        }
+                        Err(err) => {
+                            error!(%err);
+                        }
+                    }
+                }
+                LoginCredentials::ClearText {
+                    username, password, ..
+                } => {
+                    debug!(
+                        "Logging in username={} pass={}",
+                        String::from_utf8_lossy(&username[..]),
+                        String::from_utf8_lossy(&password[..])
+                    );
+                    match account_db.get_account_by_user(username).await {
+                        Ok(account) => {
+                            if let account::Password::Cleartext(cleartext) = account.password {
+                                if password == cleartext {
+                                    debug!("Successful login");
+                                } else {
+                                    warn!("Invalid password");
+                                    todo!("handle response");
+                                }
+                            } else {
+                                warn!("Invalid password type");
+                                todo!("handle response");
+                            }
+                        }
+                        Err(err) => {
+                            error!(%err);
+                        }
+                    }
+                }
+            },
+            Ok(Request::CodeKey) => {}
+            Ok(Request::OneTimeToken) => {}
+            Ok(Request::ConnectChar) => {}
+            Err(err) => error!(%err),
         }
     }
 }
