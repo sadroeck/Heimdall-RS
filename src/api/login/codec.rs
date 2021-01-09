@@ -1,4 +1,4 @@
-use async_codec::{Decode, DecodeResult, Encode};
+use async_codec::{Decode, DecodeResult, Encode, EncodeResult};
 use std::convert::TryFrom;
 use tracing::error;
 
@@ -40,11 +40,14 @@ impl Encode for LoginCodec {
     type Item = Response;
     type Error = Error;
 
-    fn encode(
-        &mut self,
-        item: &Self::Item,
-        buf: &mut [u8],
-    ) -> async_codec::EncodeResult<Self::Error> {
-        todo!("LoginCodec encoding")
+    fn encode(&mut self, item: &Self::Item, buf: &mut [u8]) -> EncodeResult<Self::Error> {
+        if buf.len() < 2 {
+            return EncodeResult::Overflow(2);
+        }
+        buf[..2].copy_from_slice(&item.command_code().to_le_bytes());
+        match item.serialize(&mut buf[2..]) {
+            Ok(size) => EncodeResult::Ok(size),
+            Err(buffer_size) => EncodeResult::Overflow(buffer_size + 2),
+        }
     }
 }

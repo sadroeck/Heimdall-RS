@@ -11,6 +11,7 @@ async-trait = "0.1"
 chrono = "0.4"
 config = { version = "0.10", default-features = false, features = ["toml"] }
 fastrand = "1.4"
+futures-util = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
 tracing = "0.1"

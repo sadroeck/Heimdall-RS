@@ -7,12 +7,12 @@ pub enum LoginCredentials {
     },
     Hashed {
         client_type: u8,
-        username: [u8; 23 + 1],
+        username: String,
         password: [u8; 16],
     },
     ClearText {
         client_type: u8,
-        username: [u8; 23 + 1],
-        password: [u8; 24],
+        username: String,
+        password: String,
     },
 }

@@ -73,7 +73,7 @@ impl AccountDB for InMemoryAccountDB {
             .ok_or(DBError::NoSuchAccount(account_id))
     }
 
-    async fn get_account_by_user(&self, user_id: UserId) -> super::DBResult<MmoAccount> {
+    async fn get_account_by_user(&self, user_id: &UserId) -> super::DBResult<MmoAccount> {
         if self.verbose {
             debug!("Getting account user={:?}", user_id);
         }
@@ -82,9 +82,9 @@ impl AccountDB for InMemoryAccountDB {
             .read()
             .await
             .iter()
-            .find(|(_, account)| account.user_id == user_id)
+            .find(|(_, account)| account.user_id == *user_id)
             .map(|(_, account)| account.clone())
-            .ok_or(DBError::NoSuchUser(user_id))
+            .ok_or(DBError::NoSuchUser(user_id.clone()))
     }
 
     async fn save_account(&self, account: &MmoAccount) -> super::DBResult<()> {

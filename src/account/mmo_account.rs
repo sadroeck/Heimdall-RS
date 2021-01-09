@@ -53,7 +53,7 @@ pub enum Sex {
 // TODO: Remove derived Debug for passwords
 #[derive(Clone, Debug)]
 pub enum Password {
-    Cleartext([u8; 24]),
+    Cleartext(String),
     MD5Hashed([u8; 16]),
     // Only set when initializing account
     None,
@@ -63,7 +63,7 @@ impl Default for MmoAccount {
     fn default() -> Self {
         Self {
             account_id: 0,
-            user_id: [0u8; 24],
+            user_id: UserId::default(),
             password: Password::None,
             sex: Sex::Male,
             email: String::from("a@a.com"),

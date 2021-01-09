@@ -12,7 +12,7 @@ pub enum LoginCommand {
     ClientLoginHashedPassV2,
     ClientLoginHashedPassV3,
     ClientLoginHashedPassV4,
-    CodeKey,
+    CreateSessionKey,
     OneTimePassLogin,
     CharConnect,
 }
@@ -31,7 +31,7 @@ impl TryFrom<u16> for LoginCommand {
             0x01fa => Ok(LoginCommand::ClientLoginHashedPassV2),
             0x027c => Ok(LoginCommand::ClientLoginHashedPassV3),
             0x0825 => Ok(LoginCommand::ClientLoginHashedPassV4),
-            0x01db => Ok(LoginCommand::CodeKey),
+            0x01db => Ok(LoginCommand::CreateSessionKey),
             0x0acf => Ok(LoginCommand::OneTimePassLogin),
             0x2710 => Ok(LoginCommand::CharConnect),
             unknown => Err(Error::InvalidCommand(unknown)),
@@ -109,7 +109,8 @@ impl LoginCommand {
             Self::ClientLoginHashedPassV4 => {
                 todo!("Parse OTPs");
             }
-            Self::CodeKey => {
+            Self::CreateSessionKey => {
+                // logclif_parse_reqkey
                 todo!("Parse CodeKey");
             }
             Self::OneTimePassLogin => {
@@ -139,8 +140,8 @@ fn parse_cleartext_credentials(data: &[u8]) -> LoginCredentials {
     copy_zero_terminated_buffer(&mut password, &data[28..28 + 24]);
     LoginCredentials::ClearText {
         client_type: data[data.len() - 1],
-        username,
-        password,
+        username: String::from_utf8_lossy(&username).to_string(),
+        password: String::from_utf8_lossy(&password).to_string(),
     }
 }
 
@@ -151,7 +152,7 @@ fn parse_hashed_credentials(data: &[u8]) -> LoginCredentials {
     copy_zero_terminated_buffer(&mut password, &data[28..28 + 16]);
     LoginCredentials::Hashed {
         client_type: data[data.len() - 1],
-        username,
+        username: String::from_utf8_lossy(&username).to_string(),
         password,
     }
 }
