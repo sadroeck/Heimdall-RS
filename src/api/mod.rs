@@ -1,4 +1,5 @@
 // pub(crate) mod character;
+pub(crate) mod character;
 pub(crate) mod login;
 
 struct RequestBuffer(pub(crate) [u8; 0xFFFF]);

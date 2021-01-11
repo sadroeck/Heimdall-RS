@@ -8,11 +8,16 @@ use async_std::{
     task,
 };
 use futures_util::SinkExt;
+use stackvec::StackVec;
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    account::{self, AccountDB},
-    api::login::{LoginCodec, LoginCredentials, LoginFailed, Request, Response},
+    account::AccountDB,
+    api::{
+        character::{CharacterServer, ServerInfo as CharacterServerInfo},
+        login::{CharacterSelectionInfo, LoginCodec, Request, Response},
+    },
+    login_agent::LoginAgent,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -21,14 +26,32 @@ pub enum ServerError {
     IO(#[from] IOError),
 }
 
-#[derive(Debug)]
-pub struct LoginServer<A: AccountDB + Send + Sync + 'static> {
-    account_db: Arc<A>,
+pub struct LoginServer<A, C>
+where
+    A: AccountDB + Send + Sync + 'static,
+    C: CharacterServer + Send + Sync + 'static,
+{
+    login_agent: Arc<LoginAgent<A, C>>,
+    char_servers: Vec<Arc<C>>,
 }
 
-impl<A: AccountDB + Send + Sync + 'static> LoginServer<A> {
-    pub fn new(account_db: Arc<A>) -> Self {
-        Self { account_db }
+impl<A, C> LoginServer<A, C>
+where
+    A: AccountDB + Send + Sync + 'static,
+    C: CharacterServer + Send + Sync + 'static,
+{
+    pub fn new(login_agent: LoginAgent<A, C>, char_servers: Vec<Arc<C>>) -> Self {
+        Self {
+            login_agent: Arc::new(login_agent),
+            char_servers,
+        }
+    }
+
+    fn character_server_info(&self) -> StackVec<[CharacterServerInfo; 5]> {
+        self.char_servers
+            .iter()
+            .map(|server| server.info())
+            .collect()
     }
 
     pub async fn run(self, addr: impl Into<SocketAddr>) -> Result<(), ServerError> {
@@ -40,121 +63,79 @@ impl<A: AccountDB + Send + Sync + 'static> LoginServer<A> {
 
         while let Some(stream) = incoming.next().await {
             let stream: TcpStream = stream?;
-            let session = LoginSession {
-                account_db: self.account_db.clone(),
-            };
-            task::spawn(async move { session.process_connection(stream).await });
+            let login_agent = self.login_agent.clone();
+            let char_server_info = self.character_server_info();
+            task::spawn(
+                async move { process_connection(login_agent, stream, char_server_info).await },
+            );
         }
         Ok(())
     }
 }
 
-struct LoginSession<A: AccountDB + Send + Sync> {
-    account_db: Arc<A>,
-}
+async fn process_connection<A, C>(
+    login_agent: Arc<LoginAgent<A, C>>,
+    stream: TcpStream,
+    char_server_info: StackVec<[CharacterServerInfo; 5]>,
+) where
+    A: AccountDB + Send + Sync + 'static,
+    C: CharacterServer + Send + Sync + 'static,
+{
+    let ip_addr = stream.peer_addr().expect("Could not retrieve peer addr");
+    debug!(ip = %ip_addr, "Received incoming connection");
 
-impl<A: AccountDB + Send + Sync> LoginSession<A> {
-    async fn process_connection(&self, stream: TcpStream) {
-        if let Ok(peer_addr) = stream.peer_addr() {
-            // TODO: Check IP blacklist
-            debug!("Received incoming connection from {}", peer_addr);
-        }
+    let mut framed_stream = Framed::new(stream, LoginCodec {});
+    let mut client_hash = Option::<[u8; 16]>::None;
 
-        let mut framed_stream = Framed::new(stream, LoginCodec {});
-
-        loop {
-            match framed_stream.next().await {
-                Some(Ok(request)) => {
-                    if let Some(response) = self.process_request(request).await {
-                        if let Err(err) = framed_stream.send(response).await {
-                            error!(%err);
-                            break;
-                        }
+    loop {
+        match framed_stream.next().await {
+            Some(Ok(request)) => {
+                let response = match request {
+                    Request::KeepAlive => {
+                        warn!(ip = %ip_addr, "unexpected KeepAlive");
+                        None
                     }
-                }
-                Some(Err(err)) => {
-                    error!(%err, "Could not parse request");
-                    break;
-                }
-                None => {
-                    debug!("End-of-stream. Terminating connection");
-                    break;
-                }
-            }
-        }
-    }
-
-    async fn process_request(&self, request: Request) -> Option<Response> {
-        match request {
-            Request::KeepAlive => {
-                debug!("Keep alive");
-                None
-            }
-            Request::UpdateClientHash(hash) => {
-                debug!("Updating client hash {:?}", hash);
-                todo!("handle update client hash");
-            }
-            Request::ClientLogin(credentials) => match credentials {
-                LoginCredentials::OTP { .. } => {
-                    todo!("Handle OTPs");
-                }
-                LoginCredentials::Hashed {
-                    username, password, ..
-                } => {
-                    // TODO: Remove printing of password
-                    debug!(%username, ?password, "Logging in username={} pass={:?}", username, password);
-                    match self.account_db.get_account_by_user(&username).await {
-                        Ok(account) => {
-                            if let account::Password::MD5Hashed(hashed) = account.password {
-                                if password == hashed {
-                                    todo!("Handle successful login");
-                                } else {
-                                    warn!(%username, "Invalid password");
-                                    todo!("handle response");
-                                }
-                            } else {
-                                warn!("Invalid password type");
-                                todo!("handle response");
+                    Request::UpdateClientHash(hash) => {
+                        client_hash = Some(hash);
+                        None
+                    }
+                    Request::ClientLogin(credentials) => {
+                        match login_agent.authenticate(credentials).await {
+                            Ok(account) => {
+                                let info = CharacterSelectionInfo {
+                                    account_id: account.account_id,
+                                    authentication_code: fastrand::u32(1..u32::MAX),
+                                    user_level: fastrand::u32(1..u32::MAX),
+                                    sex: account.sex,
+                                    web_auth_token: account.web_auth_token,
+                                    char_servers: char_server_info.clone(),
+                                };
+                                login_agent.create_session(account.account_id);
+                                Some(Response::LoginSuccessV3(info))
                             }
-                        }
-                        Err(err) => {
-                            error!(%err);
-                            None
+                            Err(failure) => Some(Response::LoginFailed(failure)),
                         }
                     }
-                }
-                LoginCredentials::ClearText {
-                    username, password, ..
-                } => {
-                    // TODO: Remove printing of password
-                    debug!(%username, %password, "Logging in");
-                    match self.account_db.get_account_by_user(&username).await {
-                        Ok(account) => {
-                            if let account::Password::Cleartext(cleartext) = account.password {
-                                if password == cleartext {
-                                    debug!("Successful login");
-                                    Some(Response::LoginSuccessV3)
-                                } else {
-                                    warn!("Invalid password");
-                                    Some(Response::LoginFailed(LoginFailed::IncorrectPassword))
-                                }
-                            } else {
-                                warn!("Invalid password type");
-                                Some(Response::LoginFailed(LoginFailed::IncorrectPassword))
-                            }
-                        }
-                        Err(err) => {
-                            error!(%err);
-                            Some(Response::LoginFailed(LoginFailed::UnregisteredId(
-                                username.clone(),
-                            )))
-                        }
+                    Request::CodeKey | Request::OneTimeToken | Request::ConnectChar => {
+                        todo!("Handle request")
+                    }
+                };
+
+                if let Some(response) = response {
+                    if let Err(err) = framed_stream.send(response).await {
+                        error!(%err);
+                        break;
                     }
                 }
-            },
-            Request::CodeKey => todo!("Handle request new session key"),
-            Request::OneTimeToken => todo!("Handle OTP"),
-            Request::ConnectChar => todo!("Handle connect char"),
+            }
+            Some(Err(err)) => {
+                error!(%err, "Could not parse request");
+                break;
+            }
+            None => {
+                debug!("End-of-stream. Terminating connection");
+                break;
+            }
         }
     }
 }

@@ -4,3 +4,8 @@ verbose = true
 [login_server]
 address = "127.0.0.1"
 port = 6900
+
+[[char_servers]]
+name = "my local server"
+address = "127.0.0.1"
+port = 6901

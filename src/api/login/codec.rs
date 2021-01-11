@@ -46,7 +46,7 @@ impl Encode for LoginCodec {
         }
         buf[..2].copy_from_slice(&item.command_code().to_le_bytes());
         match item.serialize(&mut buf[2..]) {
-            Ok(size) => EncodeResult::Ok(size),
+            Ok(size) => EncodeResult::Ok(size + 2),
             Err(buffer_size) => EncodeResult::Overflow(buffer_size + 2),
         }
     }

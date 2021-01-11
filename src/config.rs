@@ -5,6 +5,7 @@ use std::error::Error;
 pub struct Config {
     pub(crate) account_db: AccountDB,
     pub(crate) login_server: LoginServer,
+    pub(crate) char_servers: Vec<CharacterServerConfig>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -16,6 +17,13 @@ pub enum AccountDB {
 
 #[derive(Deserialize, Debug)]
 pub struct LoginServer {
+    pub(crate) address: String,
+    pub(crate) port: u16,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct CharacterServerConfig {
+    pub(crate) name: String,
     pub(crate) address: String,
     pub(crate) port: u16,
 }

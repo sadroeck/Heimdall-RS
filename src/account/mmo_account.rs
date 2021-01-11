@@ -22,11 +22,7 @@ pub struct MmoAccount {
     /// this accounts maximum character slots (maximum is limited to MAX_CHARS define in char server)
     pub(crate) char_slots: u8,
     /// packet 0x006a value + 1 (0: compte OK)
-    pub(crate) state: usize,
-    /// Ban time limit of the account (None = no ban)
-    pub(crate) unban_time: Option<SystemTime>,
-    /// validity limit of the account (None = unlimited)
-    pub(crate) expiration_time: Option<SystemTime>,
+    pub(crate) state: AccountState,
     /// number of successful auth attempts
     pub(crate) login_count: isize,
     /// date+time of last successful login
@@ -50,6 +46,16 @@ pub enum Sex {
     Server,
 }
 
+impl Into<u8> for Sex {
+    fn into(self) -> u8 {
+        match self {
+            Self::Male => 1,
+            Self::Female => 0,
+            Self::Server => 2,
+        }
+    }
+}
+
 // TODO: Remove derived Debug for passwords
 #[derive(Clone, Debug)]
 pub enum Password {
@@ -69,9 +75,7 @@ impl Default for MmoAccount {
             email: String::from("a@a.com"),
             group_id: None,
             char_slots: MAX_CHARS,
-            state: 0,
-            unban_time: None,
-            expiration_time: None,
+            state: AccountState::Normal,
             login_count: 0,
             lastlogin: SystemTime::now(),
             last_ip: Ipv4Addr::LOCALHOST,
@@ -90,4 +94,11 @@ impl MmoAccount {
             ..Default::default()
         }
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum AccountState {
+    Normal,
+    Banned(SystemTime),
+    ExpireOn(SystemTime),
 }

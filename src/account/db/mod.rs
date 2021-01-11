@@ -20,7 +20,7 @@ pub type UserId = String;
 
 #[async_trait::async_trait]
 pub trait AccountDB {
-    async fn init() -> DBResult<()>;
+    async fn init(&mut self) -> DBResult<()>;
 
     // Accounts
     async fn create_account(&self) -> DBResult<MmoAccount>;

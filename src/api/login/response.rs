@@ -1,6 +1,9 @@
 use std::time::SystemTime;
 
 use chrono::{DateTime, Utc};
+use stackvec::StackVec;
+
+use crate::{account::Sex, api::character::ServerInfo as CharacterServerInfo};
 
 const BAN_TIME_FORMAT: &str = "%Y-%M-%D %H:%M";
 
@@ -58,15 +61,15 @@ pub enum LoginFailed {
 }
 
 impl LoginFailed {
-    pub fn error_code(&self) -> u16 {
+    pub fn error_code(&self) -> u32 {
         match self {
-            Self::UnregisteredId(id) => 0,
+            Self::UnregisteredId(_) => 0,
             Self::IncorrectPassword => 1,
             Self::IdIsExpired => 2,
             Self::RejectedFromServer => 3,
             Self::AccountPermanentlySuspended => 4,
             Self::GameExeNotUpToDate => 5,
-            Self::BannedUntil(time) => 6,
+            Self::BannedUntil(_) => 6,
             Self::ServerOverpopulated => 7,
             Self::MaxCompanyCapacityReached => 8,
             Self::BannedByDBA => 9,
@@ -74,8 +77,8 @@ impl LoginFailed {
             Self::BannedByGM => 11,
             Self::TemporaryBanForDBWork => 12,
             Self::SelfLock => 13,
-            Self::GroupNotPermittedV1(usize) => 14,
-            Self::GroupNotPermittedV2(usize) => 15,
+            Self::GroupNotPermittedV1(_) => 14,
+            Self::GroupNotPermittedV2(_) => 15,
             Self::IdErased => 99,
             Self::LoginInfoRelocated => 100,
             Self::LockedForHackingInvestigation => 101,
@@ -107,17 +110,17 @@ impl LoginAborted {
 }
 
 pub enum Response {
-    LoginSuccessV1,
-    LoginSuccessV3,
+    LoginSuccessV1(CharacterSelectionInfo),
+    LoginSuccessV3(CharacterSelectionInfo),
     LoginFailed(LoginFailed),
     LoginAborted(LoginAborted),
 }
 
 impl Response {
-    pub fn command_code(&self) -> u32 {
+    pub fn command_code(&self) -> u16 {
         match self {
-            Response::LoginSuccessV1 => 0x69,
-            Response::LoginSuccessV3 => 0xac4,
+            Response::LoginSuccessV1(_) => 0x69,
+            Response::LoginSuccessV3(_) => 0xac4,
             Response::LoginFailed(_) => 0x83e,
             Response::LoginAborted(_) => 0x81,
         }
@@ -125,8 +128,42 @@ impl Response {
 
     pub fn serialize(&self, buf: &mut [u8]) -> Result<usize, usize> {
         match self {
-            Self::LoginSuccessV1 => todo!("Serialize login success v1"),
-            Self::LoginSuccessV3 => todo!("Serialize login success v3"),
+            Self::LoginSuccessV1(_info) => {
+                todo!("Handle LoginSuccessV1");
+            }
+            Self::LoginSuccessV3(info) => {
+                let msg_len = 64 + info.char_servers.len() * 160;
+                if buf.len() < msg_len {
+                    return Err(msg_len);
+                }
+                buf[..2].copy_from_slice(&(msg_len as u16).to_le_bytes());
+                buf[2..6].copy_from_slice(&info.authentication_code.to_le_bytes());
+                buf[6..10].copy_from_slice(&info.account_id.to_le_bytes());
+                buf[10..14].copy_from_slice(&info.user_level.to_le_bytes());
+                // unused (last_login_ip + last_login_time)
+                buf[14..44].copy_from_slice(&[0u8; 30]);
+                buf[44] = info.sex.into();
+                buf[45..61].copy_from_slice(&info.web_auth_token);
+                buf[61] = 0;
+                let header_offset = 62;
+                for (i, server) in info.char_servers.iter().enumerate() {
+                    let offset = header_offset + (i * 160);
+                    let ip: u32 = server.ip_addr.into();
+                    buf[offset..offset + 4].copy_from_slice(&ip.to_be_bytes());
+                    buf[offset + 4..offset + 6].copy_from_slice(&server.port.to_le_bytes());
+                    buf[offset + 6..offset + 6 + server.name.len()]
+                        .copy_from_slice(&server.name.as_bytes());
+                    buf[offset + 6 + server.name.len()] = b'\0';
+                    let server_activity: u16 = server.server_activity.into();
+                    buf[offset + 26..offset + 28].copy_from_slice(&server_activity.to_le_bytes());
+                    let server_type: u16 = server.server_type.into();
+                    buf[offset + 28..offset + 30].copy_from_slice(&server_type.to_be_bytes());
+                    buf[offset + 30..offset + 32].copy_from_slice(&[0u8; 2]);
+                    buf[offset + 32..offset + 160].copy_from_slice(&[0u8; 128]);
+                }
+
+                Ok(msg_len)
+            }
             Self::LoginFailed(failure) => {
                 if buf.len() < 20 {
                     return Err(20);
@@ -159,4 +196,13 @@ impl Response {
             }
         }
     }
+}
+
+pub struct CharacterSelectionInfo {
+    pub(crate) account_id: u32,
+    pub(crate) authentication_code: u32,
+    pub(crate) user_level: u32,
+    pub(crate) sex: Sex,
+    pub(crate) web_auth_token: [u8; 16],
+    pub(crate) char_servers: StackVec<[CharacterServerInfo; 5]>,
 }

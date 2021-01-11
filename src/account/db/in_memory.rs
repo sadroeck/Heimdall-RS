@@ -1,11 +1,9 @@
-use std::collections::{hash_map::Entry, HashMap};
-
 use async_std::sync::RwLock;
+use std::collections::{hash_map::Entry, HashMap};
 use tracing::{debug, info, warn};
 
-use crate::account::mmo_account::MmoAccount;
-
-use super::{AccountDB, AccountId, DBError, UserId};
+use crate::account::db::{AccountDB, AccountId, DBError, UserId};
+use crate::account::{mmo_account::MmoAccount, Password};
 
 pub struct InMemoryAccountDB {
     verbose: bool,
@@ -13,18 +11,25 @@ pub struct InMemoryAccountDB {
 }
 
 impl InMemoryAccountDB {
-    pub fn new(verbose: bool) -> Self {
-        Self {
+    pub async fn new(verbose: bool) -> super::DBResult<Self> {
+        let mut s = Self {
             verbose,
             accounts: RwLock::new(HashMap::new()),
-        }
+        };
+        s.init().await?;
+        Ok(s)
     }
 }
 
 #[async_trait::async_trait]
 impl AccountDB for InMemoryAccountDB {
-    async fn init() -> super::DBResult<()> {
+    async fn init(&mut self) -> super::DBResult<()> {
         info!("Initializing InMemory account DB");
+        let mut test_account = MmoAccount::default();
+        test_account.account_id = 2_000_042;
+        test_account.user_id = "sadroeck".to_string();
+        test_account.password = Password::Cleartext("olasenor".to_string());
+        self.accounts.write().await.insert(2_000_042, test_account);
         Ok(())
     }
 
@@ -33,7 +38,7 @@ impl AccountDB for InMemoryAccountDB {
         loop {
             let account_id = fastrand::u32(..);
             if self.verbose {
-                debug!("Creating new account {}", account_id);
+                debug!(%account_id, "Creating new account");
             }
             match self.accounts.write().await.entry(account_id) {
                 Entry::Vacant(entry) => {
@@ -55,7 +60,7 @@ impl AccountDB for InMemoryAccountDB {
 
     async fn delete_account(&self, account_id: AccountId) -> super::DBResult<()> {
         if self.verbose {
-            debug!("Deleting account {}", account_id);
+            debug!(%account_id, "Deleting account");
         }
         self.accounts.write().await.remove(&account_id);
         Ok(())
@@ -63,7 +68,7 @@ impl AccountDB for InMemoryAccountDB {
 
     async fn get_account_by_id(&self, account_id: AccountId) -> super::DBResult<MmoAccount> {
         if self.verbose {
-            debug!("Getting account id={}", account_id);
+            debug!(%account_id, "Getting account");
         }
         self.accounts
             .read()
@@ -75,7 +80,7 @@ impl AccountDB for InMemoryAccountDB {
 
     async fn get_account_by_user(&self, user_id: &UserId) -> super::DBResult<MmoAccount> {
         if self.verbose {
-            debug!("Getting account user={:?}", user_id);
+            debug!(%user_id, "Getting account");
         }
         // TODO: Replace full scan with secondary index UserID -> AccountID
         self.accounts

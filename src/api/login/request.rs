@@ -134,14 +134,27 @@ pub enum Request {
 }
 
 fn parse_cleartext_credentials(data: &[u8]) -> LoginCredentials {
-    let mut username = [0u8; 23 + 1];
+    let mut username = [0u8; 24];
     copy_zero_terminated_buffer(&mut username, &data[4..4 + 23 + 1]);
+
     let mut password = [0u8; 24];
     copy_zero_terminated_buffer(&mut password, &data[28..28 + 24]);
     LoginCredentials::ClearText {
         client_type: data[data.len() - 1],
-        username: String::from_utf8_lossy(&username).to_string(),
-        password: String::from_utf8_lossy(&password).to_string(),
+        username: String::from_utf8_lossy(
+            &username
+                .split(|char| *char == b'\0')
+                .next()
+                .unwrap_or_default(),
+        )
+        .to_string(),
+        password: String::from_utf8_lossy(
+            &password
+                .split(|char| *char == b'\0')
+                .next()
+                .unwrap_or_default(),
+        )
+        .to_string(),
     }
 }
 
@@ -152,7 +165,13 @@ fn parse_hashed_credentials(data: &[u8]) -> LoginCredentials {
     copy_zero_terminated_buffer(&mut password, &data[28..28 + 16]);
     LoginCredentials::Hashed {
         client_type: data[data.len() - 1],
-        username: String::from_utf8_lossy(&username).to_string(),
+        username: String::from_utf8_lossy(
+            &username
+                .split(|char| *char == b'\0')
+                .next()
+                .unwrap_or_default(),
+        )
+        .to_string(),
         password,
     }
 }
