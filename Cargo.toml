@@ -1,21 +1,2 @@
-[package]
-name = "heimdall_rs"
-version = "0.1.0"
-authors = ["Sam De Roeck <sadroeck@gmail.com>"]
-edition = "2018"
-
-[dependencies]
-anyhow = "1.0"
-async-codec = "0.4"
-async-std = "1.8"
-async-trait = "0.1"
-chrono = "0.4"
-config = { version = "0.10", default-features = false, features = ["toml"] }
-dashmap = "4.0"
-fastrand = "1.4"
-futures-util = "0.3"
-serde = { version = "1.0", features = ["derive"] }
-stackvec = "0.2"
-thiserror = "1.0"
-tracing = "0.1"
-tracing-subscriber = "0.2"
+[workspace]
+members = ["api", "login", "databases"]

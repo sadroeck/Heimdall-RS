@@ -3,7 +3,7 @@ use std::time::SystemTime;
 use chrono::{DateTime, Utc};
 use stackvec::StackVec;
 
-use crate::{account::Sex, api::character::ServerInfo as CharacterServerInfo};
+use crate::{account::mmo_account::Sex, character::ServerInfo as CharacterServerInfo};
 
 const BAN_TIME_FORMAT: &str = "%Y-%M-%D %H:%M";
 
@@ -199,10 +199,10 @@ impl Response {
 }
 
 pub struct CharacterSelectionInfo {
-    pub(crate) account_id: u32,
-    pub(crate) authentication_code: u32,
-    pub(crate) user_level: u32,
-    pub(crate) sex: Sex,
-    pub(crate) web_auth_token: [u8; 16],
-    pub(crate) char_servers: StackVec<[CharacterServerInfo; 5]>,
+    pub account_id: u32,
+    pub authentication_code: u32,
+    pub user_level: u32,
+    pub sex: Sex,
+    pub web_auth_token: [u8; 16],
+    pub char_servers: StackVec<[CharacterServerInfo; 5]>,
 }

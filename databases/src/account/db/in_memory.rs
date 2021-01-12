@@ -1,9 +1,10 @@
+use api::account::{
+    db::{AccountDB, AccountId, DBError, DBResult, UserId},
+    mmo_account::{MmoAccount, Password},
+};
 use async_std::sync::RwLock;
 use std::collections::{hash_map::Entry, HashMap};
 use tracing::{debug, info, warn};
-
-use crate::account::db::{AccountDB, AccountId, DBError, UserId};
-use crate::account::{mmo_account::MmoAccount, Password};
 
 pub struct InMemoryAccountDB {
     verbose: bool,
@@ -11,7 +12,7 @@ pub struct InMemoryAccountDB {
 }
 
 impl InMemoryAccountDB {
-    pub async fn new(verbose: bool) -> super::DBResult<Self> {
+    pub async fn new(verbose: bool) -> DBResult<Self> {
         let mut s = Self {
             verbose,
             accounts: RwLock::new(HashMap::new()),
@@ -23,7 +24,7 @@ impl InMemoryAccountDB {
 
 #[async_trait::async_trait]
 impl AccountDB for InMemoryAccountDB {
-    async fn init(&mut self) -> super::DBResult<()> {
+    async fn init(&mut self) -> DBResult<()> {
         info!("Initializing InMemory account DB");
         let mut test_account = MmoAccount::default();
         test_account.account_id = 2_000_042;
@@ -33,7 +34,7 @@ impl AccountDB for InMemoryAccountDB {
         Ok(())
     }
 
-    async fn create_account(&self) -> super::DBResult<MmoAccount> {
+    async fn create_account(&self) -> DBResult<MmoAccount> {
         let mut retries: i32 = 10;
         loop {
             let account_id = fastrand::u32(..);
@@ -58,7 +59,7 @@ impl AccountDB for InMemoryAccountDB {
         }
     }
 
-    async fn delete_account(&self, account_id: AccountId) -> super::DBResult<()> {
+    async fn delete_account(&self, account_id: AccountId) -> DBResult<()> {
         if self.verbose {
             debug!(%account_id, "Deleting account");
         }
@@ -66,7 +67,7 @@ impl AccountDB for InMemoryAccountDB {
         Ok(())
     }
 
-    async fn get_account_by_id(&self, account_id: AccountId) -> super::DBResult<MmoAccount> {
+    async fn get_account_by_id(&self, account_id: AccountId) -> DBResult<MmoAccount> {
         if self.verbose {
             debug!(%account_id, "Getting account");
         }
@@ -78,7 +79,7 @@ impl AccountDB for InMemoryAccountDB {
             .ok_or(DBError::NoSuchAccount(account_id))
     }
 
-    async fn get_account_by_user(&self, user_id: &UserId) -> super::DBResult<MmoAccount> {
+    async fn get_account_by_user(&self, user_id: &UserId) -> DBResult<MmoAccount> {
         if self.verbose {
             debug!(%user_id, "Getting account");
         }
@@ -92,7 +93,7 @@ impl AccountDB for InMemoryAccountDB {
             .ok_or(DBError::NoSuchUser(user_id.clone()))
     }
 
-    async fn save_account(&self, account: &MmoAccount) -> super::DBResult<()> {
+    async fn save_account(&self, account: &MmoAccount) -> DBResult<()> {
         if self.verbose {
             debug!("Saving account {}", account.account_id);
         }
@@ -104,21 +105,21 @@ impl AccountDB for InMemoryAccountDB {
             .map(|_| ())
     }
 
-    async fn enable_webtoken(&self, account_id: AccountId) -> super::DBResult<()> {
+    async fn enable_webtoken(&self, account_id: AccountId) -> DBResult<()> {
         if self.verbose {
             debug!("Enabling webtoken for account {}", account_id);
         }
         todo!()
     }
 
-    async fn disable_webtoken(&self, account_id: AccountId) -> super::DBResult<()> {
+    async fn disable_webtoken(&self, account_id: AccountId) -> DBResult<()> {
         if self.verbose {
             debug!("Disabling webtoken for account {}", account_id);
         }
         todo!()
     }
 
-    async fn remove_webtokens(&self) -> super::DBResult<()> {
+    async fn remove_webtokens(&self) -> DBResult<()> {
         if self.verbose {
             debug!("Removing webtokens");
         }

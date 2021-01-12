@@ -11,13 +11,11 @@ use futures_util::SinkExt;
 use stackvec::StackVec;
 use tracing::{debug, error, info, warn};
 
-use crate::{
-    account::AccountDB,
-    api::{
-        character::{CharacterServer, ServerInfo as CharacterServerInfo},
-        login::{CharacterSelectionInfo, LoginCodec, Request, Response},
-    },
-    login_agent::LoginAgent,
+use crate::agent::LoginAgent;
+use api::{
+    account::db::AccountDB,
+    character::{CharacterServer, ServerInfo as CharacterServerInfo},
+    login::{CharacterSelectionInfo, LoginCodec, Request, Response},
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -85,7 +83,6 @@ async fn process_connection<A, C>(
     debug!(ip = %ip_addr, "Received incoming connection");
 
     let mut framed_stream = Framed::new(stream, LoginCodec {});
-    let mut client_hash = Option::<[u8; 16]>::None;
 
     loop {
         match framed_stream.next().await {
@@ -95,9 +92,8 @@ async fn process_connection<A, C>(
                         warn!(ip = %ip_addr, "unexpected KeepAlive");
                         None
                     }
-                    Request::UpdateClientHash(hash) => {
-                        client_hash = Some(hash);
-                        None
+                    Request::UpdateClientHash(_hash) => {
+                        todo!("handle updating client hash");
                     }
                     Request::ClientLogin(credentials) => {
                         match login_agent.authenticate(credentials).await {

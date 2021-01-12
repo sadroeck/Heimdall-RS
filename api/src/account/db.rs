@@ -1,9 +1,5 @@
 use super::mmo_account::MmoAccount;
 
-mod in_memory;
-
-pub use in_memory::InMemoryAccountDB;
-
 #[derive(Debug, thiserror::Error)]
 pub enum DBError {
     #[error("No such account {0}")]
