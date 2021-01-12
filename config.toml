@@ -2,10 +2,11 @@
 verbose = true
 
 [login_server]
+name = "login-test-server"
 address = "127.0.0.1"
 port = 6900
 
 [[char_servers]]
-name = "my local server"
+name = "char-test-server"
 address = "127.0.0.1"
 port = 6901

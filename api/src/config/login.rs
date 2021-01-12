@@ -1,10 +1,12 @@
 use serde::Deserialize;
 
+use super::ServerConfig;
+
 #[derive(Deserialize, Debug)]
 pub struct Config {
     pub account_db: AccountDBConfig,
-    pub login_server: LoginServerConfig,
-    pub char_servers: Vec<CharacterServerConfig>,
+    pub login_server: ServerConfig,
+    pub char_servers: Vec<ServerConfig>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -12,17 +14,4 @@ pub struct Config {
 pub enum AccountDBConfig {
     InMemory { verbose: bool },
     SQL {},
-}
-
-#[derive(Deserialize, Debug)]
-pub struct LoginServerConfig {
-    pub address: String,
-    pub port: u16,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct CharacterServerConfig {
-    pub name: String,
-    pub address: String,
-    pub port: u16,
 }

@@ -4,7 +4,7 @@ use std::{
 };
 
 use super::{CharacterServer, ServerInfo, ServerType};
-use crate::config::login::CharacterServerConfig;
+use crate::config::ServerConfig;
 
 pub struct TcpServer {
     name: String,
@@ -29,7 +29,7 @@ impl CharacterServer for TcpServer {
 }
 
 impl TcpServer {
-    pub fn new(config: &CharacterServerConfig) -> Self {
+    pub fn new(config: &ServerConfig) -> Self {
         let ip_addr = config.address.parse().unwrap();
         Self {
             ip_addr,
