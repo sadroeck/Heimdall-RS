@@ -1,5 +1,6 @@
 use serde::Deserialize;
 
+pub mod character;
 pub mod login;
 
 #[derive(Deserialize, Debug)]

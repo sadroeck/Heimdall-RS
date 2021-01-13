@@ -3,8 +3,9 @@ use std::convert::TryFrom;
 use async_codec::{Decode, DecodeResult, Encode, EncodeResult};
 use tracing::error;
 
+use crate::error::PacketError;
+
 use super::{
-    error::Error,
     request::{CharacterCommand, Request},
     response::Response,
 };
@@ -13,7 +14,7 @@ pub struct CharacterCodec;
 
 impl Decode for CharacterCodec {
     type Item = Request;
-    type Error = Error;
+    type Error = PacketError;
 
     fn decode(&mut self, buffer: &mut [u8]) -> (usize, DecodeResult<Self::Item, Self::Error>) {
         if buffer.len() < 2 {
@@ -33,7 +34,7 @@ impl Decode for CharacterCodec {
 
         let (request_size, request) = match command.parse(&buffer[2..]) {
             Ok((size, request)) => (size, request),
-            Err(Error::PacketIncomplete(_count)) => return (0, DecodeResult::UnexpectedEnd),
+            Err(PacketError::PacketIncomplete(_count)) => return (0, DecodeResult::UnexpectedEnd),
             Err(err) => return (0, DecodeResult::Err(err)),
         };
         (request_size + 2, DecodeResult::Ok(request))
@@ -42,16 +43,21 @@ impl Decode for CharacterCodec {
 
 impl Encode for CharacterCodec {
     type Item = Response;
-    type Error = Error;
+    type Error = PacketError;
 
     fn encode(&mut self, item: &Self::Item, buf: &mut [u8]) -> EncodeResult<Self::Error> {
         if buf.len() < 2 {
             return EncodeResult::Overflow(2);
         }
-        buf[..2].copy_from_slice(&item.command_code().to_le_bytes());
-        match item.serialize(&mut buf[2..]) {
-            Ok(size) => EncodeResult::Ok(size + 2),
-            Err(buffer_size) => EncodeResult::Overflow(buffer_size + 2),
+        let offset = if let Some(command_code) = item.command_code() {
+            buf[..2].copy_from_slice(&command_code.to_le_bytes());
+            2
+        } else {
+            0
+        };
+        match item.serialize(&mut buf[offset..]) {
+            Ok(size) => EncodeResult::Ok(size + offset),
+            Err(buffer_size) => EncodeResult::Overflow(buffer_size + offset),
         }
     }
 }

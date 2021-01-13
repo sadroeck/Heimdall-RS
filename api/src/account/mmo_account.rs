@@ -1,6 +1,8 @@
-use std::{net::Ipv4Addr, time::SystemTime};
+use std::{convert::TryFrom, net::Ipv4Addr, time::SystemTime};
 
 use chrono::{Date, Utc};
+
+use crate::error::PacketError;
 
 use super::db::{AccountId, UserId};
 
@@ -52,6 +54,19 @@ impl Into<u8> for Sex {
             Self::Male => 1,
             Self::Female => 0,
             Self::Server => 2,
+        }
+    }
+}
+
+impl TryFrom<u8> for Sex {
+    type Error = PacketError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Female),
+            1 => Ok(Self::Male),
+            2 => Ok(Self::Server),
+            _other => Err(PacketError::InvalidRequest(String::from("Invalid sex"))),
         }
     }
 }

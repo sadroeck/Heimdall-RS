@@ -1,11 +1,13 @@
 use std::net::Ipv4Addr;
 
 pub use client::TcpClient;
+pub use codec::*;
+pub use request::*;
+pub use response::*;
 pub use server::TcpServer;
 
 mod client;
 mod codec;
-mod error;
 mod request;
 mod response;
 mod server;
