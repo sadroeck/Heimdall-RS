@@ -2,12 +2,14 @@ use std::net::Ipv4Addr;
 
 pub use client::TcpClient;
 pub use codec::*;
+use db::CharacterId;
 pub use request::*;
 pub use response::*;
 pub use server::TcpServer;
 
 mod client;
 mod codec;
+pub mod db;
 mod request;
 mod response;
 mod server;
@@ -71,5 +73,16 @@ impl Into<u16> for ServerType {
             Self::Paying => 3,
             Self::F2P => 4,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Character {
+    id: CharacterId,
+}
+
+impl Character {
+    pub fn new(id: CharacterId) -> Self {
+        Self { id }
     }
 }

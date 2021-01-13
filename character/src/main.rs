@@ -3,6 +3,7 @@ use server::CharacterServer;
 use std::net::SocketAddr;
 use tracing::info;
 
+mod authentication_db;
 mod config;
 mod server;
 mod session;

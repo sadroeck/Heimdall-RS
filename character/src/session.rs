@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
+use crate::authentication_db::AuthenticationDB;
 use api::character::{AccountInfo, CharacterSelectWindowInfo, Response};
-use databases::authentication::AuthenticationDB;
 use flume::Sender;
 use tracing::error;
 

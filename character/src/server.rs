@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::authentication_db::AuthenticationDB;
 use async_codec::Framed;
 use async_std::{
     io::Error as IOError,
@@ -7,7 +8,6 @@ use async_std::{
     stream::StreamExt,
     task,
 };
-use databases::authentication::AuthenticationDB;
 use flume::{bounded, Receiver};
 use futures_util::future::{select, Either};
 use futures_util::SinkExt;
