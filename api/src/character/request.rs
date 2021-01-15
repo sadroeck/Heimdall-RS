@@ -2,6 +2,7 @@ use std::convert::TryFrom;
 
 use crate::{account::mmo_account::Sex, error::PacketError, utils::parse_long};
 
+#[derive(Debug, Copy, Clone)]
 pub enum CharacterCommand {
     ConnectClient,
     ListCharacters,
@@ -65,7 +66,7 @@ impl CharacterCommand {
                     Err(PacketError::PacketIncomplete(15 - buf.len()))
                 }
             }
-            Self::ListCharacters => todo!("parse ListCharacters"),
+            Self::ListCharacters => Ok((2, Request::ListCharacters)),
             Self::SelectCharacter => todo!("parse SelectCharacter"),
             Self::CreateCharacter => todo!("parse CreateCharacter"),
             Self::DeleteCharacter => todo!("parse DeleteCharacter"),
@@ -76,7 +77,13 @@ impl CharacterCommand {
             Self::RequestCaptcha => todo!("parse RequestCaptcha"),
             Self::CheckCaptcha => todo!("parse CheckCaptcha"),
             Self::MoveCharacterSlot => todo!("parse MoveCharacterSlot"),
-            Self::KeepAlive => todo!("parse KeepAlive"),
+            Self::KeepAlive => {
+                if buf.len() >= 4 {
+                    Ok((4, Request::KeepAlive))
+                } else {
+                    Err(PacketError::PacketIncomplete(4 - buf.len()))
+                }
+            }
             Self::CheckPincode => todo!("parse CheckPincode"),
             Self::RequestPincode => todo!("parse RequestPincode"),
             Self::ChangePincode => todo!("parse ChangePincode"),

@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use async_codec::{Decode, DecodeResult, Encode, EncodeResult};
 use tracing::error;
 
-use crate::error::PacketError;
+use crate::{error::PacketError, utils::parse_word};
 
 use super::{
     request::{CharacterCommand, Request},
@@ -22,9 +22,7 @@ impl Decode for CharacterCodec {
         }
 
         // Parse command type
-        let mut command_buf = [0u8; 2];
-        command_buf.copy_from_slice(&buffer[..2]);
-        let command = match CharacterCommand::try_from(u16::from_le_bytes(command_buf)) {
+        let command = match CharacterCommand::try_from(parse_word(&buffer[..2])) {
             Ok(command) => command,
             Err(err) => {
                 error!(%err);
@@ -32,12 +30,14 @@ impl Decode for CharacterCodec {
             }
         };
 
-        let (request_size, request) = match command.parse(&buffer[2..]) {
-            Ok((size, request)) => (size, request),
-            Err(PacketError::PacketIncomplete(_count)) => return (0, DecodeResult::UnexpectedEnd),
-            Err(err) => return (0, DecodeResult::Err(err)),
-        };
-        (request_size + 2, DecodeResult::Ok(request))
+        match command.parse(&buffer[2..]) {
+            Ok((size, request)) => (size + 2, DecodeResult::Ok(request)),
+            Err(PacketError::PacketIncomplete(_count)) => (0, DecodeResult::UnexpectedEnd),
+            Err(err) => {
+                error!("Could not decode packet {:?}", command);
+                (0, DecodeResult::Err(err))
+            }
+        }
     }
 }
 

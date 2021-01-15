@@ -7,7 +7,7 @@ use api::{
 };
 use async_std::sync::RwLock;
 use std::collections::{hash_map::Entry, HashMap};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 pub struct InMemoryCharacterDB {
     verbose: bool,
@@ -33,6 +33,11 @@ impl CharacterDB for InMemoryCharacterDB {
         if self.verbose {
             info!("Initializing InMemory character DB");
         }
+        // self.accounts.write().await.insert(2000042, vec![2_000_000]);
+        // self.characters
+        //     .write()
+        //     .await
+        //     .insert(2_000_000, Character::new(2_000_000, 2000042));
         Ok(())
     }
 
@@ -40,17 +45,17 @@ impl CharacterDB for InMemoryCharacterDB {
         if self.verbose {
             debug!(%account_id, "Creating a new character");
         }
-        let mut char_id = 2_000_000;
+        let mut char_id = fastrand::u32(2_000_000..);
         loop {
-            char_id = fastrand::u32(2_000_000..);
             let mut chars = self.characters.write().await;
             match chars.entry(char_id) {
                 Entry::Occupied(_) => {}
                 Entry::Vacant(e) => {
-                    e.insert(Character::new(char_id));
+                    e.insert(Character::new(char_id, account_id));
                     break;
                 }
             }
+            char_id = fastrand::u32(2_000_000..);
         }
 
         match self.accounts.write().await.entry(account_id) {
@@ -61,7 +66,7 @@ impl CharacterDB for InMemoryCharacterDB {
                 e.insert(vec![char_id]);
             }
         }
-        Ok(Character::new(char_id))
+        Ok(Character::new(char_id, account_id))
     }
 
     async fn delete(&self, _id: CharacterId) -> DBResult<()> {

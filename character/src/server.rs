@@ -1,19 +1,21 @@
 use std::sync::Arc;
 
 use crate::authentication_db::AuthenticationDB;
-use async_codec::Framed;
+use async_codec::{Framed, WriteFrameError};
 use async_std::{
     io::Error as IOError,
     net::{SocketAddr, TcpListener, TcpStream},
     stream::StreamExt,
     task,
 };
-use flume::{bounded, Receiver};
-use futures_util::future::{select, Either};
+use databases::character::InMemoryCharacterDB;
 use futures_util::SinkExt;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, info_span, trace, Instrument};
 
-use api::character::{CharacterCodec, Request, Response};
+use api::{
+    character::{db::DBError, CharacterCodec, Request, Response},
+    error::PacketError,
+};
 
 use crate::session::CharacterSession;
 
@@ -21,6 +23,10 @@ use crate::session::CharacterSession;
 pub enum ServerError {
     #[error("{0}")]
     IO(#[from] IOError),
+    #[error("{0}")]
+    CharacterDB(#[from] DBError),
+    #[error("Could not send response: {0}")]
+    SendingResponse(#[from] WriteFrameError<PacketError>),
 }
 
 pub struct CharacterServer {}
@@ -36,13 +42,14 @@ impl CharacterServer {
         info!("Listening on {}", listener.local_addr()?);
 
         let authentication_db = Arc::new(AuthenticationDB::default());
+        // TODO: parse from config
+        let char_db = Arc::new(InMemoryCharacterDB::new(true).await?);
         let mut incoming = listener.incoming();
 
         while let Some(stream) = incoming.next().await {
             let stream: TcpStream = stream?;
-            let (response_tx, response_rx) = bounded(10);
-            let session = CharacterSession::new(response_tx, authentication_db.clone());
-            task::spawn(async move { process_connection(session, response_rx, stream).await });
+            let session = CharacterSession::new(authentication_db.clone(), char_db.clone());
+            task::spawn(async move { process_connection(session, stream).await });
         }
         Ok(())
     }
@@ -50,66 +57,80 @@ impl CharacterServer {
 
 async fn process_connection(
     mut session: CharacterSession,
-    response_rx: Receiver<Response>,
     stream: TcpStream,
-) {
-    let ip_addr = stream.peer_addr().expect("Could not retrieve peer addr");
-    debug!(ip = %ip_addr, "Received incoming connection");
+) -> Result<(), anyhow::Error> {
+    let socket = stream.peer_addr().expect("Could not retrieve peer addr");
+    debug!(ip = %socket.ip(), port=socket.port(), "Received incoming connection");
 
     let mut framed_stream = Framed::new(stream, CharacterCodec {});
-
-    loop {
-        let incoming_request = framed_stream.next();
-        let outgoing_response = response_rx.recv_async();
-        match select(incoming_request, outgoing_response).await {
-            Either::Left((None, _)) => {
-                debug!("connection closed by client");
-                break;
-            }
-            Either::Left((Some(Err(err)), _)) => {
-                error!(%err, "Could not parse request");
-                break;
-            }
-            Either::Left((Some(Ok(request)), _)) => {
-                match request {
-                    Request::ConnectClient(account_info) => {
-                        if session.is_authenticated(account_info).await {
-                            session.list_characters().await;
-                        } else {
-                            if let Err(err) = framed_stream.send(Response::Rejected).await {
-                                error!(%err, "Could not send response");
-                                break;
-                            }
-                        }
+    async move {
+        while let Some(request) = framed_stream.next().await {
+            match request {
+                Ok(request) => {
+                    if let Err(err) =
+                        process_request(&mut session, &mut framed_stream, request).await
+                    {
+                        error!(%err, "Could not process request");
+                        break;
                     }
-                    Request::ListCharacters => todo!("Handle ListCharacters"),
-                    Request::SelectCharacter => todo!("Handle SelectCharacter"),
-                    Request::CreateCharacter => todo!("Handle CreateCharacter"),
-                    Request::DeleteCharacter => todo!("Handle DeleteCharacter"),
-                    Request::RequestCharacterDeletion => todo!("Handle RequestCharacterDeletion"),
-                    Request::AcceptCharacterDeletion => todo!("Handle AcceptCharacterDeletion"),
-                    Request::CancelCharacterDeletion2 => todo!("Handle CancelCharacterDeletion2"),
-                    Request::RenameCharacter => todo!("Handle RenameCharacter"),
-                    Request::RequestCaptcha => todo!("Handle RequestCaptcha"),
-                    Request::CheckCaptcha => todo!("Handle CheckCaptcha"),
-                    Request::MoveCharacterSlot => todo!("Handle MoveCharacterSlot"),
-                    Request::KeepAlive => todo!("Handle KeepAlive"),
-                    Request::CheckPincode => todo!("Handle CheckPincode"),
-                    Request::RequestPincode => todo!("Handle RequestPincode"),
-                    Request::ChangePincode => todo!("Handle ChangePincode"),
-                    Request::NewPincode => todo!("Handle NewPincode"),
-                };
-            }
-            Either::Right((Ok(response), _)) => {
-                if let Err(err) = framed_stream.send(response).await {
-                    error!(%err, "Could not send response");
+                }
+                Err(err) => {
+                    error!(%err, "Could not parse request");
                     break;
                 }
             }
-            Either::Right((Err(_), _)) => {
-                debug!("No longer processing. Closing connection");
-                break;
+        }
+        framed_stream.flush().await.unwrap_or_default();
+    }
+    .instrument(info_span!("session", ip = %socket.ip()))
+    .await;
+
+    Ok(())
+}
+
+async fn process_request(
+    session: &mut CharacterSession,
+    stream: &mut Framed<TcpStream, CharacterCodec>,
+    request: Request,
+) -> Result<(), ServerError> {
+    match request {
+        Request::ConnectClient(account_info) => {
+            debug!(?account_info, "Client connecting");
+            if session.is_authenticated(account_info).await {
+                debug!(status = "authenticated");
+                stream
+                    .send(Response::AccountConnected(account_info.account_id))
+                    .await?;
+                stream.send(Response::CharacterSlotCount).await?;
+                let characters = session.get_characters().await?;
+                stream.send(Response::CharacterInfo(characters)).await?;
+                stream.send(Response::BannedCharacters).await?;
+                let pincode_info = session.get_pincode_info().await?;
+                stream.send(Response::PincodeInfo(pincode_info)).await?;
+            } else {
+                stream.send(Response::Rejected).await?;
             }
         }
+        Request::ListCharacters => {
+            debug!("Client authenticated, sending character info");
+            let characters = session.get_characters().await.unwrap();
+            stream.send(Response::Characters(characters)).await?;
+        }
+        Request::KeepAlive => trace!("Keep-alive"),
+        Request::SelectCharacter => todo!("Handle SelectCharacter"),
+        Request::CreateCharacter => todo!("Handle CreateCharacter"),
+        Request::DeleteCharacter => todo!("Handle DeleteCharacter"),
+        Request::RequestCharacterDeletion => todo!("Handle RequestCharacterDeletion"),
+        Request::AcceptCharacterDeletion => todo!("Handle AcceptCharacterDeletion"),
+        Request::CancelCharacterDeletion2 => todo!("Handle CancelCharacterDeletion2"),
+        Request::RenameCharacter => todo!("Handle RenameCharacter"),
+        Request::RequestCaptcha => todo!("Handle RequestCaptcha"),
+        Request::CheckCaptcha => todo!("Handle CheckCaptcha"),
+        Request::MoveCharacterSlot => todo!("Handle MoveCharacterSlot"),
+        Request::CheckPincode => todo!("Handle CheckPincode"),
+        Request::RequestPincode => todo!("Handle RequestPincode"),
+        Request::ChangePincode => todo!("Handle ChangePincode"),
+        Request::NewPincode => todo!("Handle NewPincode"),
     }
+    Ok(())
 }

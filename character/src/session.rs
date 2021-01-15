@@ -1,29 +1,44 @@
 use std::sync::Arc;
 
 use crate::authentication_db::AuthenticationDB;
-use api::character::{AccountInfo, CharacterSelectWindowInfo, Response};
-use flume::Sender;
+use api::{
+    character::{
+        db::{CharacterDB, DBResult},
+        AccountInfo, Character,
+    },
+    pincode::{PincodeInfo, PincodeStatus},
+};
 use tracing::error;
+use tracing_attributes::instrument;
 
 pub struct CharacterSession {
-    response_tx: Sender<Response>,
     authentication_db: Arc<AuthenticationDB>,
+    character_db: Arc<dyn CharacterDB + Send + Sync>,
     account_info: Option<AccountInfo>,
 }
 
 impl CharacterSession {
-    pub fn new(response_tx: Sender<Response>, authentication_db: Arc<AuthenticationDB>) -> Self {
+    pub fn new(
+        authentication_db: Arc<AuthenticationDB>,
+        character_db: Arc<dyn CharacterDB + Send + Sync>,
+    ) -> Self {
         Self {
-            response_tx,
             authentication_db,
+            character_db,
             account_info: None,
         }
     }
 
+    #[instrument(skip(self), level = "debug")]
     pub async fn is_authenticated(&mut self, account_info: AccountInfo) -> bool {
-        if let Some(account_info) = self.account_info.as_ref() {
-            error!(account_id = %account_info.account_id, "Already authenticated");
-            false
+        // TODO: remove
+        self.account_info = Some(account_info);
+
+        if let Some(info) = self.account_info.as_ref() {
+            // TODO: Re-enable
+            // error!(account_id = %account_info.account_id, "Already authenticated");
+            // false
+            true
         } else {
             if self.authentication_db.check_if_authenticated(account_info) {
                 self.account_info = Some(account_info);
@@ -35,18 +50,18 @@ impl CharacterSession {
         }
     }
 
-    pub async fn list_characters(&self) {
-        // todo: fetch proper info
-        let info = CharacterSelectWindowInfo {
-            normal_slots: 15,
-            vip_slots: 0,
-            billing_slots: 0,
-            producible_slots: 15,
-            valid_slots: 15,
-        };
-        self.response_tx
-            .send_async(Response::CharacterSelectWindowInfo(info))
+    #[instrument(skip(self), level = "debug")]
+    pub async fn get_pincode_info(&self) -> DBResult<PincodeInfo> {
+        Ok(PincodeInfo {
+            status: PincodeStatus::Correct,
+            account_id: self.account_info.unwrap().account_id,
+        })
+    }
+
+    #[instrument(skip(self), level = "debug")]
+    pub async fn get_characters(&self) -> DBResult<Vec<Character>> {
+        self.character_db
+            .get_by_account_id(self.account_info.unwrap().account_id)
             .await
-            .unwrap_or(());
     }
 }
