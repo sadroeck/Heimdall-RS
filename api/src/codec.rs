@@ -1,9 +1,13 @@
+use crate::map::Maps;
 use std::time::SystemTime;
 
 pub trait RagnarokCodec {
     fn encode<T: EncodeFixed>(&mut self, val: &T);
     fn encode_struct<T: EncodeStruct>(&mut self, val: &T);
     fn padding(&mut self, count: usize);
+
+    // Resource access
+    fn maps(&self) -> &Maps;
 }
 
 pub trait EncodeFixed {
@@ -55,17 +59,20 @@ impl EncodeFixed for SystemTime {
 pub struct ClientTcpCodec<'a> {
     buf: &'a mut [u8],
     cursor: usize,
+    maps: &'a Maps,
 }
 
 impl<'a> ClientTcpCodec<'a> {
-    pub fn new(buf: &'a mut [u8]) -> Self {
-        Self { buf, cursor: 0 }
+    pub fn new(maps: &'a Maps, buf: &'a mut [u8]) -> Self {
+        Self {
+            buf,
+            cursor: 0,
+            maps,
+        }
     }
-
     pub fn capacity(&self) -> usize {
         self.buf.len()
     }
-
     pub fn len(&self) -> usize {
         self.cursor
     }
@@ -87,5 +94,9 @@ impl<'a> RagnarokCodec for ClientTcpCodec<'a> {
             self.buf[i] = 0;
         }
         self.cursor += count;
+    }
+
+    fn maps(&self) -> &Maps {
+        &self.maps
     }
 }

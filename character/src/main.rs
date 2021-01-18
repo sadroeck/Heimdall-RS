@@ -34,7 +34,7 @@ fn main() -> Result<(), anyhow::Error> {
             format!("{}:{}", config.char_server.address, config.char_server.port).parse()?;
         let character_server = CharacterServer::new();
         character_server
-            .run(addr)
+            .run(config, addr)
             .await
             .map_err(anyhow::Error::from)
     })?;

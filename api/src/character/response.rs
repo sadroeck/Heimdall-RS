@@ -1,5 +1,6 @@
 use crate::account::db::AccountId;
 use crate::codec::{ClientTcpCodec, RagnarokCodec};
+use crate::map::Maps;
 use crate::{
     character::{Character, MAX_CHARACTERS_PER_ACCOUNT},
     pincode::PincodeInfo,
@@ -30,8 +31,8 @@ impl Response {
         }
     }
 
-    pub fn serialize(&self, buf: &mut [u8]) -> Result<usize, usize> {
-        let mut codec = ClientTcpCodec::new(buf);
+    pub fn serialize(&self, maps: &Maps, buf: &mut [u8]) -> Result<usize, usize> {
+        let mut codec = ClientTcpCodec::new(maps, buf);
         match self {
             Self::AccountConnected(account_id) => {
                 if codec.capacity() < 4 {

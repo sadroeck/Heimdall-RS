@@ -9,7 +9,6 @@ use crate::character::attributes::{
 use crate::codec::EncodeFixed;
 use crate::codec::RagnarokCodec;
 use crate::error::PacketError;
-use crate::map::map_name;
 use crate::{account::db::AccountId, codec::EncodeStruct};
 pub use client::TcpClient;
 pub use codec::*;
@@ -232,7 +231,12 @@ impl EncodeStruct for Character {
         codec.encode(&self.stats.luk);
         codec.encode(&self.slot);
         codec.encode(&if self.settings.rename > 0 { 0u16 } else { 1u16 });
-        codec.encode(&map_name(self.location.last_location.map_id));
+        codec.encode(
+            &codec
+                .maps()
+                .name(self.location.last_location.map_id)
+                .expect("invalid map name"),
+        );
         codec.encode(&self.status.delete_date.unwrap_or(SystemTime::UNIX_EPOCH));
         codec.encode(&(self.equipment.robe as u32));
         codec.encode(&(CHARACTER_SLOT_MOVE_ENABLED as u32));

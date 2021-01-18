@@ -94,7 +94,7 @@ impl CharacterSession {
             .get_by_account_id(account_id)
             .await
             .map_err(|err| {
-                error!(account_id = %account_id, "Could not retrieve characters");
+                error!(account_id = %account_id, %err, "Could not retrieve characters");
                 CharCreationError::NoSuchAccount(account_id)
             })?
             .len()

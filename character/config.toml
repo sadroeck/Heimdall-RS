@@ -14,3 +14,6 @@ items = [
     { id = 1681, count = 1, position = 2 },
     { id = 2301, count = 1, position = 16 },
 ]
+
+[maps]
+names_file = "../resources/maps.yaml"

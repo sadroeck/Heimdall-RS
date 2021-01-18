@@ -9,8 +9,18 @@ use super::{
     request::{CharacterCommand, Request},
     response::Response,
 };
+use crate::map::Maps;
+use std::sync::Arc;
 
-pub struct CharacterCodec;
+pub struct CharacterCodec {
+    maps: Arc<Maps>,
+}
+
+impl CharacterCodec {
+    pub fn new(maps: Arc<Maps>) -> Self {
+        Self { maps }
+    }
+}
 
 impl Decode for CharacterCodec {
     type Item = Request;
@@ -55,7 +65,7 @@ impl Encode for CharacterCodec {
         } else {
             0
         };
-        match item.serialize(&mut buf[offset..]) {
+        match item.serialize(&self.maps, &mut buf[offset..]) {
             Ok(size) => EncodeResult::Ok(size + offset),
             Err(buffer_size) => EncodeResult::Overflow(buffer_size + offset),
         }

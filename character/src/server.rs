@@ -17,7 +17,9 @@ use api::{
     error::PacketError,
 };
 
+use crate::config::Config;
 use crate::session::CharacterSession;
+use api::map::Maps;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ServerError {
@@ -36,7 +38,11 @@ impl CharacterServer {
         Self {}
     }
 
-    pub async fn run(self, addr: impl Into<SocketAddr>) -> Result<(), ServerError> {
+    pub async fn run(
+        self,
+        config: Config,
+        addr: impl Into<SocketAddr>,
+    ) -> Result<(), anyhow::Error> {
         let addr = addr.into();
         let listener = TcpListener::bind(addr).await?;
         info!("Listening on {}", listener.local_addr()?);
@@ -44,12 +50,14 @@ impl CharacterServer {
         let authentication_db = Arc::new(AuthenticationDB::default());
         // TODO: parse from config
         let char_db = Arc::new(InMemoryCharacterDB::new(true).await?);
+        let maps = Arc::new(Maps::from_file(&config.maps.names_file)?);
         let mut incoming = listener.incoming();
 
         while let Some(stream) = incoming.next().await {
             let stream: TcpStream = stream?;
             let session = CharacterSession::new(authentication_db.clone(), char_db.clone());
-            task::spawn(async move { process_connection(session, stream).await });
+            let codec = CharacterCodec::new(maps.clone());
+            task::spawn(async move { process_connection(session, codec, stream).await });
         }
         Ok(())
     }
@@ -57,12 +65,13 @@ impl CharacterServer {
 
 async fn process_connection(
     mut session: CharacterSession,
+    codec: CharacterCodec,
     stream: TcpStream,
 ) -> Result<(), anyhow::Error> {
     let socket = stream.peer_addr().expect("Could not retrieve peer addr");
     debug!(ip = %socket.ip(), port=socket.port(), "Received incoming connection");
 
-    let mut framed_stream = Framed::new(stream, CharacterCodec {});
+    let mut framed_stream = Framed::new(stream, codec);
     async move {
         while let Some(request) = framed_stream.next().await {
             match request {
