@@ -28,7 +28,7 @@ impl Maps {
         let name_to_id = maps
             .iter()
             .enumerate()
-            .map(|(i, name)| (name.clone(), i + 1 as u16))
+            .map(|(i, name)| (name.clone(), i as u16 + 1))
             .collect();
         Ok(Maps { maps, name_to_id })
     }

@@ -1,5 +1,6 @@
 use crate::account::db::AccountId;
 use crate::character::db::CharacterId;
+use serde::Deserialize;
 use std::time::SystemTime;
 
 #[repr(u16)]
@@ -328,9 +329,8 @@ pub struct Friend {
     pub name: String,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 pub struct Location {
-    pub map_server_id: usize,
     pub last_location: Point,
     pub save: Option<Point>,
     pub memo: Option<Point>,
@@ -340,11 +340,10 @@ pub struct Location {
 impl Default for Location {
     fn default() -> Self {
         Self {
-            map_server_id: 0,
             last_location: Point {
-                map_id: 0,
-                x: 0,
-                y: 0,
+                map_id: 833, // iz_int
+                x: 18,
+                y: 26,
             },
             save: None,
             memo: None,
@@ -352,7 +351,7 @@ impl Default for Location {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 pub struct Point {
     pub map_id: u16,
     pub x: u16,

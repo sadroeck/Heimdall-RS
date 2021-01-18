@@ -20,6 +20,7 @@ use api::{
 use crate::config::Config;
 use crate::session::CharacterSession;
 use api::map::Maps;
+use databases::inventory::InMemoryInventoryDB;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ServerError {
@@ -50,12 +51,19 @@ impl CharacterServer {
         let authentication_db = Arc::new(AuthenticationDB::default());
         // TODO: parse from config
         let char_db = Arc::new(InMemoryCharacterDB::new(true).await?);
+        let inventory_db = Arc::new(InMemoryInventoryDB::new(true));
         let maps = Arc::new(Maps::from_file(&config.maps.names_file)?);
+        let starting_char_config = Arc::new(config.starting_characters.clone());
         let mut incoming = listener.incoming();
 
         while let Some(stream) = incoming.next().await {
             let stream: TcpStream = stream?;
-            let session = CharacterSession::new(authentication_db.clone(), char_db.clone());
+            let session = CharacterSession::new(
+                starting_char_config.clone(),
+                authentication_db.clone(),
+                char_db.clone(),
+                inventory_db.clone(),
+            );
             let codec = CharacterCodec::new(maps.clone());
             task::spawn(async move { process_connection(session, codec, stream).await });
         }
@@ -129,7 +137,9 @@ async fn process_request(
         Request::SelectCharacter => todo!("Handle SelectCharacter"),
         Request::CreateCharacter(new_character) => {
             debug!("Creating new character");
-            session.create_character(new_character).await?;
+            let char = session.create_character(new_character).await?;
+            debug!(character_id = %char.id, "Created character");
+            stream.send(Response::NewCharacterInfo(char)).await?;
         }
         Request::DeleteCharacter => todo!("Handle DeleteCharacter"),
         Request::RequestCharacterDeletion => todo!("Handle RequestCharacterDeletion"),

@@ -41,7 +41,7 @@ impl CharacterDB for InMemoryCharacterDB {
         Ok(())
     }
 
-    async fn create(&self, account_id: AccountId) -> DBResult<api::character::Character> {
+    async fn create(&self, account_id: AccountId) -> DBResult<CharacterId> {
         if self.verbose {
             debug!(%account_id, "Creating a new character");
         }
@@ -66,7 +66,15 @@ impl CharacterDB for InMemoryCharacterDB {
                 e.insert(vec![char_id]);
             }
         }
-        Ok(Character::new(char_id, account_id))
+        Ok(char_id)
+    }
+
+    async fn update(&self, character: &Character) -> DBResult<()> {
+        self.characters
+            .write()
+            .await
+            .insert(character.id, character.clone());
+        Ok(())
     }
 
     async fn delete(&self, _id: CharacterId) -> DBResult<()> {

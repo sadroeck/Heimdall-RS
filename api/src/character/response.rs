@@ -11,6 +11,7 @@ pub enum Response {
     Rejected,
     CharacterSlotCount,
     CharacterInfo(Vec<Character>),
+    NewCharacterInfo(Character),
     Characters(Vec<Character>),
     CharacterPagesAvailable(u32),
     BannedCharacters,
@@ -24,6 +25,7 @@ impl Response {
             Self::Rejected => Some(0x6c),
             Self::CharacterSlotCount => Some(0x82d),
             Self::CharacterInfo(_) => Some(0x6b),
+            Self::NewCharacterInfo(_) => Some(0x6d),
             Self::Characters(_) => Some(0x99d),
             Self::CharacterPagesAvailable(_) => Some(0x9a0),
             Self::BannedCharacters => Some(0x20d),
@@ -72,6 +74,13 @@ impl Response {
                 characters
                     .iter()
                     .for_each(|character| codec.encode_struct(character));
+            }
+            Self::NewCharacterInfo(character) => {
+                let frame_size = 2 + Character::FRAME_SIZE;
+                if codec.capacity() < frame_size {
+                    return Err(frame_size);
+                }
+                codec.encode_struct(character);
             }
             Self::Characters(characters) => {
                 let frame_size = 2

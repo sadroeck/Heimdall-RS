@@ -63,7 +63,10 @@ impl CharacterCommand {
                         account_id: parse_long(&buf[..4]),
                         authentication_code: parse_long(&buf[4..8]),
                         user_level: parse_long(&buf[8..12]),
-                        sex: Sex::try_from(buf[14])?,
+                        sex: Sex::try_from(buf[14]).map_err(|_| {
+                            error!("Invalid sex: {}", buf[14]);
+                            PacketError::InvalidRequest("Invalid sex".to_string())
+                        })?,
                     };
                     Ok((15, Request::ConnectClient(account_info)))
                 } else {
@@ -81,15 +84,16 @@ impl CharacterCommand {
                         appearance: Appearance {
                             hair: parse_word(&buf[27..29]),
                             hair_color: parse_word(&buf[25..27]),
-                            clothes: 0,
-                            clothes_color: 0,
-                            body: 0,
+                            ..Default::default()
                         },
                         class: Class::try_from(parse_word(&buf[29..31])).map_err(|err| {
                             error!(%err, "Could not parse class");
                             PacketError::InvalidRequest("Invalid class".to_string())
                         })?,
-                        sex: Sex::try_from(buf[33])?,
+                        sex: Sex::try_from(buf[33]).map_err(|_| {
+                            error!("Invalid sex: {}", buf[33]);
+                            PacketError::InvalidRequest("Invalid sex".to_string())
+                        })?,
                     };
                     Ok((34, Request::CreateCharacter(new_character)))
                 } else {

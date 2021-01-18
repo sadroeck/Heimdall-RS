@@ -1,4 +1,6 @@
+use api::character::attributes::Location;
 use api::config::ServerConfig;
+use api::inventory::Item;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Clone)]
@@ -16,14 +18,9 @@ pub struct StartingCharacterConfig {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct StartingCharacter {
-    pub items: Vec<StartingItem>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct StartingItem {
-    pub id: u16,
-    pub count: u16,
-    pub position: Option<u16>,
+    pub items: Vec<Item>,
+    #[serde(default)]
+    pub location: Location,
 }
 
 #[derive(Deserialize, Debug, Clone)]

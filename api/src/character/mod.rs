@@ -42,6 +42,8 @@ const OPTIONS_INCOMPATIBLE_WITH_WEAPON: u32 = 0x20
     | 0x8000000;
 pub const CHARACTER_SLOT_MOVE_ENABLED: bool = true;
 pub const CHARACTER_RENAME_ENABLED: bool = true;
+/// The maximum number of inventory slots
+pub const MAX_INVENTORY_SIZE: usize = 100;
 
 #[async_trait::async_trait]
 pub trait CharacterServer {
@@ -195,7 +197,7 @@ impl EncodeStruct for Character {
         codec.encode(&self.experience.job_exp);
         codec.encode(&(self.experience.job_level as u32));
         codec.padding(8);
-        codec.encode(&self.status.option);
+        codec.encode(&(self.status.option & !0x40));
         codec.encode(&self.status.karma.unwrap_or_default());
         codec.encode(&self.status.manner.unwrap_or_default());
         codec.encode(&self.experience.status_points);
