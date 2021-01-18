@@ -2,3 +2,15 @@
 name = "char-test-1"
 address = "127.0.0.1"
 port = 6901
+
+[starting_characters.novice]
+items = [
+    { id = 1201, count = 1, position = 2 },
+    { id = 2301, count = 1, position = 16 },
+]
+
+[starting_characters.doram]
+items = [
+    { id = 1681, count = 1, position = 2 },
+    { id = 2301, count = 1, position = 16 },
+]

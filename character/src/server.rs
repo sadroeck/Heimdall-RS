@@ -92,7 +92,7 @@ async fn process_request(
     session: &mut CharacterSession,
     stream: &mut Framed<TcpStream, CharacterCodec>,
     request: Request,
-) -> Result<(), ServerError> {
+) -> Result<(), anyhow::Error> {
     match request {
         Request::ConnectClient(account_info) => {
             debug!(?account_info, "Client connecting");
@@ -113,12 +113,15 @@ async fn process_request(
         }
         Request::ListCharacters => {
             debug!("Client authenticated, sending character info");
-            let characters = session.get_characters().await.unwrap();
+            let characters = session.get_characters().await?;
             stream.send(Response::Characters(characters)).await?;
         }
         Request::KeepAlive => trace!("Keep-alive"),
         Request::SelectCharacter => todo!("Handle SelectCharacter"),
-        Request::CreateCharacter => todo!("Handle CreateCharacter"),
+        Request::CreateCharacter(new_character) => {
+            debug!("Creating new character");
+            session.create_character(new_character).await?;
+        }
         Request::DeleteCharacter => todo!("Handle DeleteCharacter"),
         Request::RequestCharacterDeletion => todo!("Handle RequestCharacterDeletion"),
         Request::AcceptCharacterDeletion => todo!("Handle AcceptCharacterDeletion"),

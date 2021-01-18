@@ -10,7 +10,7 @@ async-codec = "0.4"
 async-std = "1.8"
 chrono = "0.4"
 fastrand = "1.4"
-int-enum = "0.4"
+int-enum = { version = "0.4", features = ["convert"] }
 serde = { version = "1.0", features = ["derive"] }
 stackvec = "0.2"
 thiserror = "1.0"

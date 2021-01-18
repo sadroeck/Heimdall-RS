@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 pub mod login;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct ServerConfig {
     pub name: String,
     pub address: String,

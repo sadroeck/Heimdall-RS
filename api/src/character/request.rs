@@ -1,6 +1,10 @@
 use std::convert::TryFrom;
 
+use crate::character::attributes::{Appearance, Class, Stats};
+use crate::character::CharacterName;
+use crate::utils::parse_word;
 use crate::{account::mmo_account::Sex, error::PacketError, utils::parse_long};
+use tracing::error;
 
 #[derive(Debug, Copy, Clone)]
 pub enum CharacterCommand {
@@ -68,7 +72,30 @@ impl CharacterCommand {
             }
             Self::ListCharacters => Ok((2, Request::ListCharacters)),
             Self::SelectCharacter => todo!("parse SelectCharacter"),
-            Self::CreateCharacter => todo!("parse CreateCharacter"),
+            Self::CreateCharacter => {
+                if buf.len() >= 34 {
+                    let new_character = NewCharacter {
+                        name: CharacterName::try_from(buf)?,
+                        slot: buf[24],
+                        stats: Default::default(),
+                        appearance: Appearance {
+                            hair: parse_word(&buf[27..29]),
+                            hair_color: parse_word(&buf[25..27]),
+                            clothes: 0,
+                            clothes_color: 0,
+                            body: 0,
+                        },
+                        class: Class::try_from(parse_word(&buf[29..31])).map_err(|err| {
+                            error!(%err, "Could not parse class");
+                            PacketError::InvalidRequest("Invalid class".to_string())
+                        })?,
+                        sex: Sex::try_from(buf[33])?,
+                    };
+                    Ok((34, Request::CreateCharacter(new_character)))
+                } else {
+                    Err(PacketError::PacketIncomplete(34 - buf.len()))
+                }
+            }
             Self::DeleteCharacter => todo!("parse DeleteCharacter"),
             Self::RequestCharacterDeletion => todo!("parse RequestCharacterDeletion"),
             Self::AcceptCharacterDeletion => todo!("parse AcceptCharacterDeletion"),
@@ -97,7 +124,7 @@ pub enum Request {
     ConnectClient(AccountInfo),
     ListCharacters,
     SelectCharacter,
-    CreateCharacter,
+    CreateCharacter(NewCharacter),
     DeleteCharacter,
     RequestCharacterDeletion,
     AcceptCharacterDeletion,
@@ -118,5 +145,15 @@ pub struct AccountInfo {
     pub account_id: u32,
     pub authentication_code: u32,
     pub user_level: u32,
+    pub sex: Sex,
+}
+
+#[derive(Debug, Clone)]
+pub struct NewCharacter {
+    pub name: CharacterName,
+    pub slot: u8,
+    pub stats: Stats,
+    pub appearance: Appearance,
+    pub class: Class,
     pub sex: Sex,
 }

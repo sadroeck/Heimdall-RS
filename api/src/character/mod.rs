@@ -8,6 +8,7 @@ use crate::character::attributes::{
 };
 use crate::codec::EncodeFixed;
 use crate::codec::RagnarokCodec;
+use crate::error::PacketError;
 use crate::map::map_name;
 use crate::{account::db::AccountId, codec::EncodeStruct};
 pub use client::TcpClient;
@@ -16,9 +17,10 @@ use db::CharacterId;
 pub use request::*;
 pub use response::*;
 pub use server::TcpServer;
+use std::convert::TryFrom;
 use std::time::SystemTime;
 
-mod attributes;
+pub mod attributes;
 mod client;
 mod codec;
 pub mod db;
@@ -115,6 +117,25 @@ impl EncodeFixed for CharacterName {
         let len = min(Self::SIZE, name.len());
         buf[..len].copy_from_slice(&name[..len]);
         buf[len] = b'\0';
+    }
+}
+
+impl TryFrom<&[u8]> for CharacterName {
+    type Error = PacketError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() < Self::SIZE {
+            return Err(PacketError::PacketIncomplete(Self::SIZE));
+        }
+        Ok(CharacterName(
+            String::from_utf8_lossy(
+                &value[..Self::SIZE]
+                    .split(|char| *char == b'\0')
+                    .next()
+                    .unwrap_or_default(),
+            )
+            .to_string(),
+        ))
     }
 }
 

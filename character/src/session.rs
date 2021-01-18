@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use crate::authentication_db::AuthenticationDB;
+use api::account::db::AccountId;
+use api::character::{attributes, NewCharacter, MAX_CHARACTERS_PER_ACCOUNT};
 use api::{
     character::{
         db::{CharacterDB, DBResult},
@@ -10,6 +12,18 @@ use api::{
 };
 use tracing::error;
 use tracing_attributes::instrument;
+
+#[derive(Debug, thiserror::Error)]
+pub enum CharCreationError {
+    #[error("Slot {0} is invalid")]
+    InvalidSlot(u8),
+    #[error("Too many characters exist: {0}")]
+    TooManyCharacters(u8),
+    #[error("Invalid starting class {0:?}")]
+    InvalidClass(attributes::Class),
+    #[error("No such account {0}")]
+    NoSuchAccount(AccountId),
+}
 
 pub struct CharacterSession {
     authentication_db: Arc<AuthenticationDB>,
@@ -63,5 +77,42 @@ impl CharacterSession {
         self.character_db
             .get_by_account_id(self.account_info.unwrap().account_id)
             .await
+    }
+
+    #[instrument(skip(self), level = "debug")]
+    pub async fn create_character(
+        &self,
+        new_character: NewCharacter,
+    ) -> Result<Character, CharCreationError> {
+        if new_character.slot as usize >= MAX_CHARACTERS_PER_ACCOUNT {
+            return Err(CharCreationError::InvalidSlot(new_character.slot));
+        }
+
+        let account_id = self.account_info.unwrap().account_id;
+        if self
+            .character_db
+            .get_by_account_id(account_id)
+            .await
+            .map_err(|err| {
+                error!(account_id = %account_id, "Could not retrieve characters");
+                CharCreationError::NoSuchAccount(account_id)
+            })?
+            .len()
+            >= MAX_CHARACTERS_PER_ACCOUNT
+        {
+            return Err(CharCreationError::TooManyCharacters(
+                MAX_CHARACTERS_PER_ACCOUNT as u8,
+            ));
+        }
+        // Just ignore the slot & index ourselves
+        match new_character.class {
+            attributes::Class::Novice | attributes::Class::Summoner => Ok(()),
+            invalid => Err(CharCreationError::InvalidClass(invalid)),
+        }?;
+
+        // TODO: Initialize doram class properly
+        let experience = attributes::Experience::default();
+
+        todo!()
     }
 }
