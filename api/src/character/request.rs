@@ -74,7 +74,13 @@ impl CharacterCommand {
                 }
             }
             Self::ListCharacters => Ok((2, Request::ListCharacters)),
-            Self::SelectCharacter => todo!("parse SelectCharacter"),
+            Self::SelectCharacter => {
+                if buf.len() >= 1 {
+                    Ok((1, Request::SelectCharacter { slot: buf[0] }))
+                } else {
+                    Err(PacketError::PacketIncomplete(1 - buf.len()))
+                }
+            }
             Self::CreateCharacter => {
                 if buf.len() >= 34 {
                     let new_character = NewCharacter {
@@ -127,7 +133,7 @@ impl CharacterCommand {
 pub enum Request {
     ConnectClient(AccountInfo),
     ListCharacters,
-    SelectCharacter,
+    SelectCharacter { slot: u8 },
     CreateCharacter(NewCharacter),
     DeleteCharacter,
     RequestCharacterDeletion,

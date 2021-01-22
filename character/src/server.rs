@@ -134,7 +134,19 @@ async fn process_request(
             stream.send(Response::Characters(characters)).await?;
         }
         Request::KeepAlive => trace!("Keep-alive"),
-        Request::SelectCharacter => todo!("Handle SelectCharacter"),
+        Request::SelectCharacter { slot } => {
+            debug!("Selecting char slot {}", slot);
+            match session.select_character(slot).await {
+                Ok(character) => {
+                    todo!("handle character selection");
+                    todo!("Set character online in OnlineDB");
+                }
+                Err(err) => {
+                    error!(%err, "Could not select character");
+                    stream.send(Response::Rejected).await?;
+                }
+            }
+        }
         Request::CreateCharacter(new_character) => {
             debug!("Creating new character");
             let char = session.create_character(new_character).await?;

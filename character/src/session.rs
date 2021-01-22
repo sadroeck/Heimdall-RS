@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use crate::authentication_db::AuthenticationDB;
 use crate::config::StartingCharacterConfig;
@@ -30,6 +31,20 @@ pub enum CharCreationError {
     InventoryDB(#[from] InventoryDBError),
     #[error("Internal {0}")]
     CharacterDB(#[from] CharacterDBError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum CharSelectionError {
+    #[error("Account is not authenticated")]
+    UnAuthenticated,
+    #[error("No character on slot {0}")]
+    NoSuchSlot(u8),
+    #[error("Character is banned")]
+    Banned,
+    #[error("Character is deleted")]
+    Deleted,
+    #[error("Cannot select character while retrieving guild bound items")]
+    RetrievingGuildBoundItems,
 }
 
 pub struct CharacterSession {
@@ -153,6 +168,30 @@ impl CharacterSession {
         char.sex = sex;
         self.character_db.update(&char).await?;
 
+        Ok(char)
+    }
+
+    pub async fn select_character(&self, slot: u8) -> Result<Character, CharSelectionError> {
+        let account_id = self
+            .account_info
+            .ok_or(CharSelectionError::UnAuthenticated)?
+            .account_id;
+        let char = self
+            .character_db
+            .get_by_slot(account_id, slot)
+            .await
+            .map_err(|_| CharSelectionError::NoSuchSlot(slot))?;
+        if char.status.delete_date.is_some() {
+            return Err(CharSelectionError::Deleted);
+        }
+        if let Some(time) = char.status.unban_on {
+            if time < SystemTime::now() {
+                return Err(CharSelectionError::Banned);
+            }
+        }
+        if char.status.option & 1 > 0 {
+            return Err(CharSelectionError::RetrievingGuildBoundItems);
+        }
         Ok(char)
     }
 }

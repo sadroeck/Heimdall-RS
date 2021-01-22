@@ -110,4 +110,20 @@ impl CharacterDB for InMemoryCharacterDB {
             .cloned()
             .ok_or_else(|| DBError::NoSuchCharacter(id))
     }
+
+    async fn get_by_slot(&self, account_id: u32, slot: u8) -> DBResult<Character> {
+        let chars = self.accounts.read().await.get(&account_id).cloned();
+        if let Some(chars) = chars {
+            for char_id in chars {
+                if let Some(char) = self.characters.read().await.get(&char_id) {
+                    if char.slot == slot as u16 {
+                        return Ok(char.clone());
+                    }
+                }
+            }
+            Err(DBError::NoSuchSlot(slot))
+        } else {
+            Err(DBError::NoSuchSlot(slot))
+        }
+    }
 }
