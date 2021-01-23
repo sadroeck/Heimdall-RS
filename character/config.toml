@@ -3,6 +3,10 @@ name = "char-test-1"
 address = "127.0.0.1"
 port = 6901
 
+[character_db]
+type = "InMemory"
+verbose = true
+
 [starting_characters.novice]
 items = [
     { id = 1201, amount = 1, slot = 2 },

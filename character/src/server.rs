@@ -17,7 +17,7 @@ use api::{
     error::PacketError,
 };
 
-use crate::config::Config;
+use crate::config::{CharacterDBConfig, Config};
 use crate::session::CharacterSession;
 use api::map::Maps;
 use databases::inventory::InMemoryInventoryDB;
@@ -44,15 +44,20 @@ impl CharacterServer {
         config: Config,
         addr: impl Into<SocketAddr>,
     ) -> Result<(), anyhow::Error> {
+        // Initialize DBs
+        let authentication_db = Arc::new(AuthenticationDB::default());
+        let char_db = match config.character_db {
+            CharacterDBConfig::InMemory { verbose } => {
+                Arc::new(InMemoryCharacterDB::new(verbose).await?)
+            }
+        };
+        let inventory_db = Arc::new(InMemoryInventoryDB::new(true));
+        let maps = Arc::new(Maps::from_file(&config.maps.names_file)?);
+
         let addr = addr.into();
         let listener = TcpListener::bind(addr).await?;
         info!("Listening on {}", listener.local_addr()?);
 
-        let authentication_db = Arc::new(AuthenticationDB::default());
-        // TODO: parse from config
-        let char_db = Arc::new(InMemoryCharacterDB::new(true).await?);
-        let inventory_db = Arc::new(InMemoryInventoryDB::new(true));
-        let maps = Arc::new(Maps::from_file(&config.maps.names_file)?);
         let starting_char_config = Arc::new(config.starting_characters.clone());
         let mut incoming = listener.incoming();
 

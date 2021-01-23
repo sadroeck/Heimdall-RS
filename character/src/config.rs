@@ -6,6 +6,7 @@ use serde::Deserialize;
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {
     pub char_server: ServerConfig,
+    pub character_db: CharacterDBConfig,
     pub starting_characters: StartingCharacterConfig,
     pub maps: MapConfig,
 }
@@ -26,4 +27,10 @@ pub struct StartingCharacter {
 #[derive(Deserialize, Debug, Clone)]
 pub struct MapConfig {
     pub names_file: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(tag = "type")]
+pub enum CharacterDBConfig {
+    InMemory { verbose: bool },
 }
